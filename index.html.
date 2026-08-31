@@ -1,0 +1,139 @@
+import speech_recognition as sr
+import pyttsx3
+import datetime
+import webbrowser
+import requests
+from bs4 import BeautifulSoup
+import json
+import os
+
+# ================== CONFIG ==================
+TIMETABLE_FILE = "timetable.json"
+DOE_URL = "http://edudel.nic.in"
+STUDENT_NAME = "Your Name"
+STUDENT_ID = "12345"  # Your DoE Student ID
+DOB = "01-01-2000"    # Your DOB for results
+
+# ================== VOICE ENGINE ==================
+engine = pyttsx3.init()
+engine.setProperty('rate', 170)
+engine.setProperty('volume', 0.9)
+
+def speak(text):
+    print(f"Jarvis: {text}")
+    engine.say(text)
+    engine.runAndWait()
+
+# ================== LISTEN ==================
+def listen():
+    r = sr.Recognizer()
+    with sr.Microphone() as source:
+        print("Listening...")
+        r.adjust_for_ambient_noise(source, duration=0.5)
+        try:
+            audio = r.listen(source, timeout=5)
+            command = r.recognize_google(audio).lower()
+            print(f"You: {command}")
+            return command
+        except:
+            return ""
+
+# ================== TIMETABLE ==================
+def load_timetable():
+    if os.path.exists(TIMETABLE_FILE):
+        with open(TIMETABLE_FILE, 'r') as f:
+            return json.load(f)
+    # Default timetable (Monday-Friday)
+    default = {
+        "monday": ["9:00 AM - Math", "10:00 AM - Science", "11:00 AM - English", "1:00 PM - History"],
+        "tuesday": ["9:00 AM - Science", "10:00 AM - Math", "11:00 AM - Geography", "1:00 PM - English"],
+        "wednesday": ["9:00 AM - English", "10:00 AM - History", "11:00 AM - Math", "1:00 PM - Science"],
+        "thursday": ["9:00 AM - Geography", "10:00 AM - English", "11:00 AM - Science", "1:00 PM - Math"],
+        "friday": ["9:00 AM - Math", "10:00 AM - Science", "11:00 AM - English", "1:00 PM - Art"],
+        "saturday": ["9:00 AM - Sports", "10:00 AM - Library"],
+        "sunday": ["Holiday"]
+    }
+    save_timetable(default)
+    return default
+
+def save_timetable(timetable):
+    with open(TIMETABLE_FILE, 'w') as f:
+        json.dump(timetable, f, indent=2)
+
+def get_today_schedule():
+    day = datetime.datetime.now().strftime("%A").lower()
+    tt = load_timetable()
+    return tt.get(day, ["No classes today"])
+
+# ================== DOE PORTAL ==================
+def open_doe():
+    webbrowser.open(DOE_URL)
+    speak("Opening Directorate of Education portal")
+
+def check_results():
+    speak(f"Checking results for {STUDENT_NAME}, ID {STUDENT_ID}")
+    # Simulated result fetch (actual DoE requires captcha/session handling)
+    # For real integration, use Selenium with login
+    speak("Results: Please visit edudel.nic.in for official results")
+    webbrowser.open(f"{DOE_URL}/results.aspx")
+
+def get_academic_calendar():
+    speak("Fetching academic calendar")
+    webbrowser.open(f"{DOE_URL}/academiccalendar.aspx")
+
+# ================== MAIN COMMANDS ==================
+def process_command(command):
+    if "time" in command:
+        now = datetime.datetime.now().strftime("%I:%M %p")
+        speak(f"The time is {now}")
+    
+    elif "timetable" in command or "schedule" in command:
+        schedule = get_today_schedule()
+        if schedule == ["No classes today"]:
+            speak("No classes today. Enjoy your day off!")
+        else:
+            speak(f"Today's schedule: {', '.join(schedule)}")
+    
+    elif "add" in command and "timetable" in command:
+        speak("Say day and subject, e.g., Monday 10 AM Math")
+        details = listen()
+        if details:
+            parts = details.split(" ", 2)
+            if len(parts) >= 3:
+                day, time, subject = parts[0], parts[1], parts[2]
+                tt = load_timetable()
+                tt.setdefault(day.lower(), []).append(f"{time} - {subject}")
+                save_timetable(tt)
+                speak(f"Added {subject} on {day} at {time}")
+    
+    elif "doe" in command:
+        if "result" in command:
+            check_results()
+        elif "calendar" in command:
+            get_academic_calendar()
+        else:
+            open_doe()
+    
+    elif "help" in command:
+        speak("Commands: time, timetable, add timetable, doe, result, calendar, exit")
+    
+    elif "exit" in command or "bye" in command:
+        speak("Goodbye! Study hard!")
+        return False
+    
+    else:
+        speak("I didn't get that. Say help for commands.")
+    
+    return True
+
+# ================== RUN ==================
+def jarvis():
+    speak(f"Hello {STUDENT_NAME}! I am Jarvis. How can I help?")
+    while True:
+        command = listen()
+        if command:
+            if not process_command(command):
+                break
+
+if __name__ == "__main__":
+    jarvis()
